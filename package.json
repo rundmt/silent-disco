@@ -1,0 +1,31 @@
+{
+  "name": "silent-disco",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Turn a Mac into a silent disco transmitter. Listeners join from their phone browser on the same Wi-Fi.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node dev.js",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@xstate/solid": "2.0.0",
+    "qrcode-generator": "2.0.4",
+    "solid-js": "1.9.17",
+    "xstate": "5.33.2"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vite-plugin-solid": "2.11.14",
+    "vitest": "^3.2.7"
+  },
+  "license": "MIT"
+}

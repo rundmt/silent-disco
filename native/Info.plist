@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key>
+  <string>Silent Disco</string>
+  <key>CFBundleDisplayName</key>
+  <string>Silent Disco</string>
+  <key>CFBundleIdentifier</key>
+  <string>app.silentdisco.mac</string>
+  <key>CFBundleExecutable</key>
+  <string>silent-disco</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>0.3.0</string>
+  <key>CFBundleVersion</key>
+  <string>3</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>14.2</string>
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.music</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>NSAudioCaptureUsageDescription</key>
+  <string>Silent Disco records what your DJ software plays so it can stream it to phones on your Wi-Fi.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Silent Disco can stream an audio input, such as a mixer or audio interface, to phones on your Wi-Fi.</string>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Phones on your Wi-Fi connect to Silent Disco to hear the music.</string>
+</dict>
+</plist>
