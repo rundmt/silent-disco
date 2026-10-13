@@ -1,4 +1,4 @@
-import { onCleanup, onMount } from 'solid-js';
+import { createEffect, onCleanup, onMount } from 'solid-js';
 import { getAnalyser } from './audioOutput';
 import { onFlash } from './flash';
 import { palettes, type Visual } from '../shared/visuals';
@@ -42,6 +42,14 @@ const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').match
  */
 export function Visualizer(props: { visual: Visual; playing: boolean }) {
   let canvas!: HTMLCanvasElement;
+  let glowEl!: HTMLDivElement;
+  // Set whenever a still frame needs redrawing: the canvas is only touched
+  // while music is moving it, so an idle phone isn't repainting 60 times a second.
+  let dirty = true;
+  createEffect(() => {
+    void [props.visual.style, props.visual.palette, props.playing];
+    dirty = true;
+  });
 
   onMount(() => {
     const g = canvas.getContext('2d')!;
@@ -64,24 +72,41 @@ export function Visualizer(props: { visual: Visual; playing: boolean }) {
     // pushed the drawing off center.
     let w = 0;
     let h = 0;
+    // The visuals are soft glows and lines, so 1.5x looks the same as a 3x
+    // screen's full resolution at a quarter of the pixels to fill.
     const resize = () => {
-      const dpr = Math.min(devicePixelRatio || 1, 2);
+      const dpr = Math.min(devicePixelRatio || 1, 1.5);
       w = canvas.clientWidth;
       h = canvas.clientHeight;
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dirty = true;
     };
     resize();
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
 
+    // Layout reads are slow, so the center is re-measured twice a second.
+    let focus = centerTarget(w, h);
+    let focusAt = 0;
+    let glowKey = '';
+
     const draw = (now: number) => {
       raf = requestAnimationFrame(draw);
+      if (now - focusAt > 500) {
+        const f = centerTarget(w, h);
+        if (f.x !== focus.x || f.y !== focus.y || f.r !== focus.r) dirty = true;
+        focus = f;
+        focusAt = now;
+      }
+      const style = props.visual.style;
+      const analyser = props.playing && style !== 'off' ? getAnalyser() : null;
+      if (!analyser && !flash && !dirty) return; // nothing on screen is changing
+      dirty = false;
+
       const stops = palettes[props.visual.palette].colors.map(hexToRgb);
       g.clearRect(0, 0, w, h);
-
-      const analyser = props.playing ? getAnalyser() : null;
       if (analyser) {
         if (freq.length !== analyser.frequencyBinCount) freq = new Uint8Array(analyser.frequencyBinCount);
         if (wave.length !== analyser.fftSize) wave = new Uint8Array(analyser.fftSize);
@@ -95,25 +120,31 @@ export function Visualizer(props: { visual: Visual; playing: boolean }) {
       bassAvg += (bass - bassAvg) * 0.05;
       const kick = Math.max(0, bass - bassAvg) * 3; // jumps on beats
 
-      const focus = centerTarget(w, h);
-      if (props.visual.style !== 'off') {
-        // A glow that breathes with the bass.
-        const glow = g.createRadialGradient(focus.x, focus.y, 0, focus.x, focus.y, Math.max(w, h) * 0.8);
-        glow.addColorStop(0, colorAt(stops, 0, 0.12 + bass * 0.3 + kick * 0.2));
-        glow.addColorStop(1, colorAt(stops, 0, 0));
-        g.fillStyle = glow;
-        g.fillRect(0, 0, w, h);
+      // A glow that breathes with the bass. It's a CSS layer whose opacity
+      // changes, which the GPU handles, rather than a full-screen gradient
+      // painted into the canvas every frame.
+      const key = `${props.visual.palette}|${Math.round(focus.x)}|${Math.round(focus.y)}|${w}|${h}`;
+      if (key !== glowKey) {
+        glowKey = key;
+        const [r, gr, b] = stops[0];
+        glowEl.style.background = `radial-gradient(circle ${Math.round(Math.max(w, h) * 0.8)}px at ${Math.round(focus.x)}px ${Math.round(focus.y)}px, rgb(${r},${gr},${b}), transparent)`;
+      }
+      glowEl.style.opacity = style === 'off' ? '0' : String(Math.min(1, 0.12 + bass * 0.3 + kick * 0.2));
+
+      if (style !== 'off') {
         g.globalCompositeOperation = 'lighter';
-        if (props.visual.style === 'ring') drawRing(g, w, h, freq, stops, bass, kick, focus);
-        if (props.visual.style === 'bars') drawBars(g, w, h, freq, stops);
-        if (props.visual.style === 'wave') drawWave(g, w, h, wave, stops, bass, focus.y);
+        if (style === 'ring') drawRing(g, w, h, freq, stops, bass, kick, focus);
+        if (style === 'bars') drawBars(g, w, h, freq, stops);
+        if (style === 'wave') drawWave(g, w, h, wave, stops, bass, focus.y);
         g.globalCompositeOperation = 'source-over';
       }
 
       if (flash) {
         const t = (now - flash.at) / 450;
-        if (t >= 1) flash = null;
-        else {
+        if (t >= 1) {
+          flash = null;
+          dirty = true; // clear it on the next frame
+        } else {
           g.globalAlpha = (1 - t) * (reducedMotion() ? 0.3 : 0.85);
           g.fillStyle = flash.color;
           g.fillRect(0, 0, w, h);
@@ -130,7 +161,12 @@ export function Visualizer(props: { visual: Visual; playing: boolean }) {
     });
   });
 
-  return <canvas ref={canvas} class="visualizer" aria-hidden="true" />;
+  return (
+    <>
+      <div ref={glowEl} class="visualizer viz-glow" aria-hidden="true" />
+      <canvas ref={canvas} class="visualizer" aria-hidden="true" />
+    </>
+  );
 }
 
 /**

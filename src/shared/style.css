@@ -115,6 +115,7 @@ button.small { padding: 6px 12px; font-size: 13px; border-radius: 8px; }
 
 /* Phone visuals */
 .visualizer { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+.viz-glow { opacity: 0; will-change: opacity; }
 .listener > :not(.visualizer) { position: relative; z-index: 1; }
 .visuals-panel { margin-top: 16px; }
 .visuals-row { display: flex; flex-wrap: wrap; gap: 8px 28px; }
@@ -138,8 +139,7 @@ button.small { padding: 6px 12px; font-size: 13px; border-radius: 8px; }
 .stage-center { width: min(52vw, 34vh); aspect-ratio: 1; border-radius: 50%; flex: none; }
 .stage-controls {
   width: min(420px, 100%); display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding: 12px 14px;
-  background: rgba(11, 11, 18, 0.55); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px;
-  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  background: rgba(11, 11, 18, 0.72); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px;
 }
 .stage-controls .vol { flex: 1; display: flex; align-items: center; gap: 8px; margin: 0; min-width: 0; }
 .stage-controls .vol input { flex: 1; min-width: 0; }

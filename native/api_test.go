@@ -239,3 +239,29 @@ func TestConsoleAPIEvents(t *testing.T) {
 		t.Fatalf("console stream sent %v, want state and tick", seen)
 	}
 }
+
+func TestPagesAreGzipped(t *testing.T) {
+	c := newConsoleClient(t)
+	for _, p := range []string{"/", "/console.html"} {
+		req, _ := http.NewRequest("GET", c.srv.URL+p, nil)
+		req.Header.Set("Accept-Encoding", "gzip")
+		res, err := http.DefaultTransport.RoundTrip(req) // no transparent decompression
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.Header.Get("Content-Encoding") != "gzip" || !strings.HasPrefix(res.Header.Get("Content-Type"), "text/html") {
+			t.Errorf("%s: encoding %q type %q", p, res.Header.Get("Content-Encoding"), res.Header.Get("Content-Type"))
+		}
+	}
+	// Clients that don't ask for gzip get the plain file.
+	req, _ := http.NewRequest("GET", c.srv.URL+"/", nil)
+	res, err := http.DefaultTransport.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.Header.Get("Content-Encoding") != "" {
+		t.Error("gzipped a response the client didn't ask to be gzipped")
+	}
+}

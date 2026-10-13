@@ -7,7 +7,6 @@ import (
 	"embed"
 	"flag"
 	"fmt"
-	"io/fs"
 	"log"
 	"net"
 	"net/http"
@@ -193,24 +192,6 @@ func listenFrom(port int) (net.Listener, int, error) {
 		}
 	}
 	return nil, 0, fmt.Errorf("no free port between %d and %d", port, port+19)
-}
-
-// webHandler serves the phone page from the embedded build of the web app.
-func webHandler() http.Handler {
-	dist, err := fs.Sub(webFiles, "web/dist")
-	if err != nil {
-		log.Fatal(err)
-	}
-	files := http.FileServer(http.FS(dist))
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasPrefix(r.URL.Path, "/assets/"):
-			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-		default:
-			w.Header().Set("Cache-Control", "no-store")
-		}
-		files.ServeHTTP(w, r)
-	})
 }
 
 // lanAddresses lists this machine's IPv4 addresses, Wi-Fi/Ethernet first.

@@ -56,6 +56,10 @@ func NewBroadcaster(hub *Hub, kbps int) (*Broadcaster, error) {
 	s := webrtc.SettingEngine{}
 	// LAN only: IPv4 host candidates are all we need, no STUN/TURN.
 	s.SetNetworkTypes([]webrtc.NetworkType{webrtc.NetworkTypeUDP4})
+	// Phones hide their address behind an mDNS name, so the working pair is
+	// usually peer-reflexive, and Pion waits a full second before choosing one
+	// of those. On a LAN there's nothing better coming, so choose at once.
+	s.SetPrflxAcceptanceMinWait(0)
 
 	track, err := webrtc.NewTrackLocalStaticSample(codec, "audio", "silent-disco")
 	if err != nil {
