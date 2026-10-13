@@ -1,6 +1,8 @@
 // Talks to the Silent Disco app (native/api.go). The window opens this page
 // with a one-time token in the URL hash; every request carries it.
 
+import type { Visual } from '../shared/visuals';
+
 export type SourceKind = 'system' | 'app' | 'input' | 'tone';
 
 export interface SourceInfo {
@@ -16,6 +18,7 @@ export interface SourceInfo {
 export interface State {
   name: string;
   kbps: number;
+  visual: Visual;
   live: boolean;
   port: number;
   addresses: string[] | null;
@@ -66,6 +69,8 @@ export const api = {
   setName: (name: string) => post('/api/settings', { name }),
   setKbps: (kbps: number) => post('/api/settings', { kbps }),
   openPrivacy: (kind: 'audio' | 'mic') => post('/api/privacy', { kind }),
+  setVisual: (visual: Visual) => post('/api/visual', visual),
+  flash: (color: string) => post('/api/flash', { color }),
 };
 
 export const iconUrl = (icon: string) => `${icon}&t=${encodeURIComponent(token)}`;

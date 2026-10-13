@@ -12,6 +12,7 @@ import { assign, fromCallback, sendTo, setup, type EventObject } from 'xstate';
 import { connectEvents, postSignal, type PartyMeta, type ServerMessage } from '../shared/signaling';
 import { peerActor, type PeerEvent, type PeerStats } from './peer';
 import * as output from './audioOutput';
+import { emitFlash } from './flash';
 
 const JOIN_RETRY_MS = 8000;
 const DROP_GRACE_MS = 4000;
@@ -47,6 +48,8 @@ const signaling = fromCallback<EventObject, void, ServerEvent>(({ sendBack }) =>
           return sendBack({ type: 'SERVER.OFFER', sdp: msg.sdp, kbps: msg.kbps });
         case 'candidate':
           return sendBack({ type: 'SERVER.CANDIDATE', candidate: msg.candidate });
+        case 'flash':
+          return emitFlash(msg.color); // purely visual, not part of the connection flow
       }
     },
     () => sendBack({ type: 'SERVER.LOST' }),
@@ -71,7 +74,12 @@ export const listenerMachine = setup({
   actors: { signaling, peer: peerActor },
   actions: {
     unlockAudio: () => output.unlock(),
+    storeWelcome: assign(({ event, context }) => {
+      if (event.type !== 'SERVER.WELCOME') return {};
+      return { myId: event.id, hostOnline: !!event.hostOnline, meta: event.meta ?? context.meta, serverLost: false };
+    }),
     stopAudio: () => output.detach(),
+    stopKeepAlive: () => output.stopKeepAlive(),
     resumeAudio: () => output.resume(),
     setVolume: assign(({ event }) => {
       if (event.type !== 'VOLUME') return {};
@@ -96,6 +104,9 @@ export const listenerMachine = setup({
     // We can only ask the DJ for a stream once the server has given us an id.
     canJoin: ({ context }) => context.hostOnline && !!context.myId,
     hasId: ({ context }) => !!context.myId,
+    isNewId: ({ context, event }) => event.type === 'SERVER.WELCOME' && event.id !== context.myId,
+    hostIsOffline: ({ event }) => event.type === 'SERVER.WELCOME' && !event.hostOnline,
+    canResumeJoin: ({ context, event }) => event.type === 'SERVER.WELCOME' && event.id === context.myId && !!event.hostOnline,
   },
 }).createMachine({
   id: 'listener',
@@ -110,14 +121,7 @@ export const listenerMachine = setup({
   },
   invoke: { src: 'signaling' },
   on: {
-    'SERVER.WELCOME': {
-      actions: assign(({ event, context }) => ({
-        myId: event.id,
-        hostOnline: event.hostOnline,
-        meta: event.meta ?? context.meta,
-        serverLost: false,
-      })),
-    },
+    'SERVER.WELCOME': { actions: 'storeWelcome' },
     'SERVER.META': { actions: assign({ meta: ({ event }) => event.meta }) },
     'SERVER.HOST_ONLINE': { actions: assign({ hostOnline: true, meta: ({ event }) => event.meta }) },
     'SERVER.HOST_OFFLINE': { actions: assign({ hostOnline: false }) },
@@ -131,21 +135,19 @@ export const listenerMachine = setup({
     },
     listening: {
       entry: 'acquireWakeLock',
-      exit: ['sendLeave', 'stopAudio', 'releaseWakeLock', assign({ stats: null })],
+      exit: ['sendLeave', 'stopAudio', 'stopKeepAlive', 'releaseWakeLock', assign({ stats: null })],
       on: {
         TAP: 'idle',
         VISIBLE: { actions: ['acquireWakeLock', 'resumeAudio'] },
-        // The server restarted (new id) or the DJ page reopened: start over.
-        'SERVER.WELCOME': {
-          target: '.checkHost',
-          reenter: true,
-          actions: assign(({ event, context }) => ({
-            myId: event.id,
-            hostOnline: event.hostOnline,
-            meta: event.meta ?? context.meta,
-            serverLost: false,
-          })),
-        },
+        'SERVER.WELCOME': [
+          // A new id means the server restarted: start over.
+          { guard: 'isNewId', target: '.checkHost', reenter: true, actions: 'storeWelcome' },
+          // Same id: the event stream blipped (Android drops it whenever
+          // Chrome goes to the background) and resumed. The audio connection
+          // is separate and still fine, so keep playing.
+          { guard: 'hostIsOffline', target: '.waitingForHost', actions: 'storeWelcome' },
+          { actions: 'storeWelcome' },
+        ],
         'SERVER.HOST_ONLINE': {
           guard: 'hasId',
           target: '.joining',
@@ -158,7 +160,9 @@ export const listenerMachine = setup({
         checkHost: {
           always: [{ guard: 'canJoin', target: 'joining' }, { target: 'waitingForHost' }],
         },
-        waitingForHost: {},
+        waitingForHost: {
+          on: { 'SERVER.WELCOME': { guard: 'canResumeJoin', target: 'joining', actions: 'storeWelcome' } },
+        },
         joining: {
           entry: 'sendJoin',
           after: { [JOIN_RETRY_MS]: { target: 'joining', reenter: true } },

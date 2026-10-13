@@ -12,9 +12,10 @@ type Settings struct {
 	Kbps        int    `json:"kbps"`
 	Source      string `json:"source,omitempty"`      // last source the DJ picked
 	SourceLabel string `json:"sourceLabel,omitempty"` // its name, for "waiting for …"
+	Visual      Visual `json:"visual"`
 }
 
-var defaultSettings = Settings{Name: "Silent Disco", Kbps: 192}
+var defaultSettings = Settings{Name: "Silent Disco", Kbps: 192, Visual: defaultVisual}
 
 func settingsPath() string {
 	dir, err := os.UserConfigDir()
@@ -36,6 +37,9 @@ func loadSettings(path string) Settings {
 		s.Name = defaultSettings.Name
 	}
 	s.Kbps = clampKbps(s.Kbps)
+	if !s.Visual.valid() {
+		s.Visual = defaultVisual
+	}
 	return s
 }
 

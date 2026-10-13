@@ -16,14 +16,46 @@ import (
 )
 
 type Meta struct {
-	Name string `json:"name"`
-	Live bool   `json:"live"`
+	Name   string `json:"name"`
+	Live   bool   `json:"live"`
+	Visual Visual `json:"visual"`
+}
+
+// Visual is the look the DJ picks for every phone (see src/shared/visuals.ts).
+type Visual struct {
+	Style   string `json:"style"`
+	Palette string `json:"palette"`
+}
+
+var defaultVisual = Visual{Style: "ring", Palette: "neon"}
+
+func (v Visual) valid() bool {
+	switch v.Style {
+	case "ring", "bars", "wave", "off":
+	default:
+		return false
+	}
+	switch v.Palette {
+	case "neon", "sunset", "ocean", "mono":
+		return true
+	}
+	return false
 }
 
 type client struct {
 	id  string
-	out chan []byte
+	out chan []byte // survives reconnects, so messages sent during a blip arrive after it
+
+	attached bool          // an event stream is reading out right now
+	stop     chan struct{} // closed when a newer stream takes over
+	linger   *time.Timer   // checks on a detached client
 }
+
+// A phone's event stream drops whenever Android puts Chrome in the
+// background, but its audio connection carries on. So a dropped stream keeps
+// its id, the browser resumes with it (Last-Event-ID), and the phone is only
+// forgotten once its audio connection is gone too.
+const lingerCheck = 30 * time.Second
 
 // Hub tracks connected phones and routes their signaling messages.
 type Hub struct {
@@ -33,6 +65,7 @@ type Hub struct {
 
 	OnJoin      func(id string)
 	OnLeave     func(id string)
+	OnActive    func(id string) bool // whether the phone's audio connection is still up
 	OnAnswer    func(id, sdp string)
 	OnCandidate func(id string, candidate json.RawMessage)
 }
@@ -108,9 +141,8 @@ func (h *Hub) ServeEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
-	c := &client{id: newID(), out: make(chan []byte, 64)}
+	c, stop := h.attach(r.Header.Get("Last-Event-ID"))
 	h.mu.Lock()
-	h.clients[c.id] = c
 	meta := h.meta
 	h.mu.Unlock()
 
@@ -120,25 +152,75 @@ func (h *Hub) ServeEvents(w http.ResponseWriter, r *http.Request) {
 	ping := time.NewTicker(15 * time.Second)
 	defer func() {
 		ping.Stop()
-		h.mu.Lock()
-		delete(h.clients, c.id)
-		h.mu.Unlock()
-		if h.OnLeave != nil {
-			h.OnLeave(c.id)
-		}
+		h.detach(c, stop)
 	}()
 
 	for {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-stop:
+			return
 		case data := <-c.out:
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			fmt.Fprintf(w, "id: %s\ndata: %s\n\n", c.id, data)
 			flusher.Flush()
 		case <-ping.C:
 			fmt.Fprint(w, ": ping\n\n")
 			flusher.Flush()
 		}
+	}
+}
+
+// attach starts a stream for a phone, resuming its old id if it has one.
+func (h *Hub) attach(lastID string) (*client, chan struct{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	c := h.clients[lastID]
+	if c == nil {
+		c = &client{id: newID(), out: make(chan []byte, 64)}
+		h.clients[c.id] = c
+	}
+	if c.linger != nil {
+		c.linger.Stop()
+		c.linger = nil
+	}
+	if c.attached {
+		close(c.stop) // the old stream hasn't noticed it's dead yet
+	}
+	c.attached = true
+	c.stop = make(chan struct{})
+	return c, c.stop
+}
+
+func (h *Hub) detach(c *client, stop chan struct{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.clients[c.id] != c || c.stop != stop {
+		return // forgotten, or a newer stream took over
+	}
+	c.attached = false
+	c.linger = time.AfterFunc(lingerCheck, func() { h.checkDetached(c) })
+}
+
+// checkDetached forgets a phone whose stream hasn't come back, once it isn't
+// receiving audio either.
+func (h *Hub) checkDetached(c *client) {
+	if h.OnActive != nil && h.OnActive(c.id) {
+		h.mu.Lock()
+		if h.clients[c.id] == c && !c.attached {
+			c.linger = time.AfterFunc(lingerCheck, func() { h.checkDetached(c) })
+		}
+		h.mu.Unlock()
+		return
+	}
+	h.mu.Lock()
+	gone := h.clients[c.id] == c && !c.attached
+	if gone {
+		delete(h.clients, c.id)
+	}
+	h.mu.Unlock()
+	if gone && h.OnLeave != nil {
+		h.OnLeave(c.id)
 	}
 }
 

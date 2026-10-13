@@ -215,6 +215,21 @@ func (b *Broadcaster) Leave(id string) {
 	}
 }
 
+// Active reports whether a phone still has a working audio connection.
+func (b *Broadcaster) Active(id string) bool {
+	b.mu.Lock()
+	p := b.peers[id]
+	b.mu.Unlock()
+	if p == nil {
+		return false
+	}
+	switch p.pc.ConnectionState() {
+	case webrtc.PeerConnectionStateFailed, webrtc.PeerConnectionStateClosed:
+		return false
+	}
+	return true
+}
+
 func (b *Broadcaster) removeIf(id string, pc *webrtc.PeerConnection) {
 	b.mu.Lock()
 	if p := b.peers[id]; p != nil && p.pc == pc {

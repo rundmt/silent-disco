@@ -27,6 +27,7 @@ vi.mock('./audioOutput', () => ({
   resume: vi.fn(),
   attach: vi.fn(),
   detach: vi.fn(),
+  stopKeepAlive: vi.fn(),
   setVolume: vi.fn(),
 }));
 
@@ -39,6 +40,7 @@ const EVENTS: ListenerEvent[] = [
   { type: 'TAP' },
   { type: 'SERVER.WELCOME', id: 'me', hostOnline: true, meta: party(true) },
   { type: 'SERVER.WELCOME', id: 'me', hostOnline: false, meta: party(false) },
+  { type: 'SERVER.WELCOME', id: 'restarted', hostOnline: true, meta: party(true) },
   { type: 'SERVER.HOST_ONLINE', meta: party(true) },
   { type: 'SERVER.HOST_OFFLINE' },
   { type: 'SERVER.META', meta: party(false) },
@@ -87,7 +89,13 @@ const signals = () => vi.mocked(postSignal).mock.calls.map(([m]) => m.type);
 const lastCall = (fn: { mock: { invocationCallOrder: number[] } }) => fn.mock.invocationCallOrder.at(-1) ?? 0;
 
 /** Rules that must hold in every reachable state. */
-function checkInvariants(s: Snapshot, peers: ReturnType<typeof fakePeers>['peers'], event: EventObject | undefined, prev: Snapshot) {
+function checkInvariants(
+  s: Snapshot,
+  peers: ReturnType<typeof fakePeers>['peers'],
+  event: EventObject | undefined,
+  prev: Snapshot,
+  peersBefore: number,
+) {
   const alive = peers.filter((p) => p.alive);
   const inSession = s.matches({ listening: 'session' });
 
@@ -107,6 +115,18 @@ function checkInvariants(s: Snapshot, peers: ReturnType<typeof fakePeers>['peers
 
   // Starting to listen unlocks audio inside the tap (mobile autoplay rules).
   if (event?.type === 'TAP' && prev.matches('idle')) expect(output.unlock).toHaveBeenCalled();
+
+  // The event stream resuming with the same id (Android drops it in the
+  // background) never touches a working audio connection.
+  const welcome = event?.type === 'SERVER.WELCOME' ? (event as Extract<ListenerEvent, { type: 'SERVER.WELCOME' }>) : null;
+  if (welcome && welcome.id === prev.context.myId && welcome.hostOnline && prev.matches({ listening: 'session' })) {
+    expect(s.value).toEqual(prev.value);
+    expect(peers.length).toBe(peersBefore);
+  }
+  // A new id means the server restarted, so any old connection is dropped and we rejoin.
+  if (welcome && welcome.id !== prev.context.myId && prev.matches('listening')) {
+    expect(inSession).toBe(false);
+  }
 
   // ICE candidates reach the live connection.
   if (event?.type === 'SERVER.CANDIDATE' && inSession && prev.matches({ listening: 'session' })) {
@@ -156,7 +176,7 @@ function checkTransitionRules(prev: Snapshot, s: Snapshot, event: EventObject) {
   // A blip that lasts, or an offer that never connects, triggers a rejoin.
   if (isDelayed(event) && wasInSession) expect(s.matches({ listening: 'joining' })).toBe(true);
   // If the DJ leaves, we wait for them, without a connection.
-  if (event.type === 'SERVER.HOST_OFFLINE' && wasListening) expect(s.matches({ listening: 'waitingForHost' })).toBe(true);
+  if ((event.type === 'SERVER.HOST_OFFLINE' || (event.type === 'SERVER.WELCOME' && !(event as { hostOnline?: boolean }).hostOnline)) && wasListening) expect(s.matches({ listening: 'waitingForHost' })).toBe(true);
   // When the DJ comes back, listeners who are listening rejoin by themselves.
   if (event.type === 'SERVER.HOST_ONLINE' && wasListening && s.context.myId) expect(s.matches({ listening: 'joining' })).toBe(true);
   // An offer while listening always starts a fresh connection.
@@ -187,13 +207,14 @@ describe('listener machine (model-based)', () => {
     ).start();
     events.forEach((event, i) => {
       const prev = actor.getSnapshot();
+      const peersBefore = peers.length;
       if (isWait(event)) vi.advanceTimersByTime(event.ms);
       else if (isDelayed(event)) vi.advanceTimersByTime(delayOf(event));
       else actor.send(event as ListenerEvent);
       const now = actor.getSnapshot();
       try {
         if (expectedValues[i] !== undefined) expect(now.value).toEqual(expectedValues[i]);
-        checkInvariants(now, peers, event, prev);
+        checkInvariants(now, peers, event, prev, peersBefore);
         checkTransitionRules(prev, now, event);
       } catch (err) {
         (err as Error).message = `after ${describePath(events.slice(0, i + 1).map((event) => ({ event })))}\n${(err as Error).message}`;

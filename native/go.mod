@@ -7,6 +7,7 @@ require (
 	github.com/pion/interceptor v0.1.49
 	github.com/pion/webrtc/v4 v4.2.23
 	gopkg.in/hraban/opus.v2 v2.0.0-20230925203106-0188a62cb302
+	pgregory.net/rapid v1.3.0
 )
 
 require (

@@ -2,6 +2,23 @@
 
 Turn your Mac into a silent disco transmitter. You play music on the Mac (DJ software, Spotify, anything), and people on the same Wi-Fi scan a QR code, tap **Listen** in their phone's browser and hear it in their headphones. No app for listeners, no special hardware.
 
+## What it looks like
+
+<table>
+  <tr>
+    <td width="60%"><img src="docs/host-live.png" alt="DJ console while on air, with QR code and listener count"></td>
+    <td width="20%"><img src="docs/listener-join.png" alt="Phone page: Tap to listen"></td>
+    <td width="20%"><img src="docs/listener-playing.png" alt="Phone page: listening live with visualizer and volume"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>1. The DJ goes live</b><br>Pick the audio source, hit <i>Go live</i>, show the QR code.</td>
+    <td align="center"><b>2. Guests scan and tap</b><br>No app or account, just a browser.</td>
+    <td align="center"><b>3. Everyone dances silently</b><br>Own headphones, own volume, ~60 ms delay.</td>
+  </tr>
+</table>
+
+**In short:** the music plays on your Mac, the Mac streams it over Wi-Fi to every phone that scans the QR code, and each guest listens in their own headphones while the room stays quiet.
+
 ## How it works
 
 ```
@@ -87,7 +104,12 @@ npm run dev        # hot reload on http://localhost:8080/host.html
 npm run build      # rebuild dist/ for `npm start`
 npm run typecheck
 npm test           # model-based tests of both state machines
+npm run test:go    # the Mac app's Go tests, with the race detector
+npm run test:e2e   # browser tests against the real app (builds it first)
+npm run test:all   # all of the above, plus typecheck
 ```
+
+The first time on a machine, `npx playwright install chromium` fetches the browser the e2e tests use.
 
 ### Model-based tests
 
@@ -97,6 +119,18 @@ npm test           # model-based tests of both state machines
 * **Transition rules** say what a specific event must do, written separately from the machine. For example: a failed connection always rejoins, a blip while playing waits before rejoining, and picking a device never takes you off air.
 
 When you change a machine, the paths regenerate automatically, so new states get covered without writing new tests.
+
+### Tests for the Mac app (`native/`)
+
+The phone page's machines are statecharts, so XState can walk them. The Go engine isn't a statechart; its model is a fake Mac plus a list of rules, and [rapid](https://github.com/flyingmutant/rapid) generates the walks:
+
+* **Model-based** (`engine_model_test.go`). Thousands of random party timelines: apps open, quit, restart and start playing, inputs get plugged and unplugged, macOS blocks a source, the DJ picks sources and goes live. After every step the engine must obey the rules: exactly one capture while capturing, of the right processes; an error always says why; once the DJ picks a source it never switches away on its own; phones are told the truth about being live and hear silence when off air. Rescans have their own rules (follow an app to its new processes after a restart, wait under the same name when it quits, don't retry a blocked capture until something changes). A failure shrinks to the shortest timeline that breaks a rule.
+* **Property** (`property_test.go`). Rules that hold for any input: the resampler gives the right length, never overshoots, keeps a steady level, and sounds the same however Core Audio chunks the buffers; every full 20 ms of audio is exactly one Opus frame; each process lands in one app and the list is in DJ-first order; any settings file, even garbage, loads as something usable; and the hub never forgets a phone whose audio is still playing, however its event streams drop and reconnect.
+* **Real audio** (`audio_test.go`). A fake phone built from Pion connects over real WebRTC, decodes the Opus it receives, and checks the test chord arrives with C♯ on the left and E on the right. Then it goes off air (silence, not a gap), drops its event stream (the audio keeps flowing), and resumes as the same phone.
+* **Console API** (`api_test.go`). The token and this-Mac-only checks, source picks, going live, name and quality limits, visuals and flashes reaching phones.
+* **Browser** (`e2e/`). Chromium phone pages and the DJ console against the real binary with `-nowindow -tone`: a phone hears the DJ, off air and back, the stream to the page server is cut and the music keeps playing on the same connection, the DJ restyles and flashes phones.
+
+`native/build.sh` runs the Go tests before building and stops if they fail (`SKIP_TESTS=1 ./build.sh` to build anyway).
 
 In dev mode, phones can still join from the QR code. Unlike `npm start`, dev mode doesn't lock the host page to this Mac.
 

@@ -34,6 +34,8 @@ func (a *consoleAPI) register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/live", a.guard(a.live))
 	mux.HandleFunc("POST /api/settings", a.guard(a.settings))
 	mux.HandleFunc("POST /api/privacy", a.guard(a.privacy))
+	mux.HandleFunc("POST /api/visual", a.guard(a.visual))
+	mux.HandleFunc("POST /api/flash", a.guard(a.flash))
 }
 
 // consoleURL is where the app window points.
@@ -184,5 +186,29 @@ func (a *consoleAPI) privacy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	openPrivacySettings(body.Kind)
+	writeJSON(w, map[string]bool{"ok": true})
+}
+
+func (a *consoleAPI) visual(w http.ResponseWriter, r *http.Request) {
+	var v Visual
+	if !decode(w, r, &v) {
+		return
+	}
+	if !a.e.SetVisual(v) {
+		http.Error(w, "unknown style or palette", http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, a.e.State())
+}
+
+func (a *consoleAPI) flash(w http.ResponseWriter, r *http.Request) {
+	var body struct{ Color string }
+	if !decode(w, r, &body) {
+		return
+	}
+	if !a.e.Flash(body.Color) {
+		http.Error(w, "bad color", http.StatusBadRequest)
+		return
+	}
 	writeJSON(w, map[string]bool{"ok": true})
 }

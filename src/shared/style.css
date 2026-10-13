@@ -58,8 +58,8 @@ label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 6px
 }
 .play {
   width: 200px; height: 200px; border-radius: 50%; font-size: 22px;
-  background: radial-gradient(circle at 30% 30%, var(--accent2), var(--accent));
-  box-shadow: 0 0 60px rgba(124, 92, 255, 0.5);
+  background: radial-gradient(circle at 30% 30%, var(--c2, var(--accent2)), var(--c1, var(--accent)));
+  box-shadow: 0 0 60px color-mix(in srgb, var(--c1, var(--accent)) 55%, transparent);
 }
 .play.playing { animation: pulse 1.6s ease-in-out infinite; }
 @keyframes pulse { 50% { box-shadow: 0 0 100px rgba(34, 211, 238, 0.7); transform: scale(1.03); } }
@@ -67,6 +67,8 @@ label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 6px
 .vol input { width: 100%; }
 .stats { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--muted); }
 .hint-narrow { max-width: 320px; font-size: 13px; }
+.android-tip { margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; text-align: left; line-height: 1.5; background: rgba(11, 11, 18, 0.75); }
+.android-tip strong { color: var(--text); }
 .divider { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
 
 /* DJ console (the Mac app window) */
@@ -112,3 +114,40 @@ button.small { padding: 6px 12px; font-size: 13px; border-radius: 8px; }
 .stats-row { display: flex; justify-content: space-around; text-align: center; margin-top: 8px; }
 .big-number.dim { color: var(--muted); }
 .console .qr svg { width: 180px; height: 180px; }
+
+/* Phone visuals */
+.visualizer { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+.listener > :not(.visualizer) { position: relative; z-index: 1; }
+.visuals-panel { margin-top: 16px; }
+.visuals-row { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+.visuals-row label { margin-top: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: transparent; border: 1px solid var(--line); color: var(--text); padding: 7px 12px; font-size: 13px; border-radius: 999px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+.chip:hover { background: #1c1c2c; }
+.chip.selected { border-color: var(--accent); background: #221d40; }
+.swatch { width: 18px; height: 10px; border-radius: 5px; display: inline-block; }
+.flash-btn { width: 34px; height: 34px; padding: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); }
+.flash-btn:active { transform: scale(0.9); }
+
+/* Listening: a full-screen stage for the visuals, with slim controls */
+.listener.stage { min-height: 100dvh; justify-content: space-between; gap: 0; padding: max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom)); }
+.listener input[type=range] { accent-color: var(--c2, var(--accent2)); }
+.stage-top h1 { font-size: 20px; }
+.status-line { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); margin-top: 4px; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.live-dot.on { background: var(--c2, var(--live)); box-shadow: 0 0 10px var(--c2, var(--live)); animation: blink 1.6s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: 0.4; } }
+.stage-center { width: min(52vw, 34vh); aspect-ratio: 1; border-radius: 50%; flex: none; }
+.stage-controls {
+  width: min(420px, 100%); display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding: 12px 14px;
+  background: rgba(11, 11, 18, 0.55); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px;
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+.stage-controls .vol { flex: 1; display: flex; align-items: center; gap: 8px; margin: 0; min-width: 0; }
+.stage-controls .vol input { flex: 1; min-width: 0; }
+.vol-icon { font-size: 14px; opacity: 0.7; }
+.stop { width: 44px; height: 44px; padding: 0; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--c1, var(--accent)); }
+.stop span { width: 14px; height: 14px; border-radius: 3px; background: white; }
+.stage-controls .stats { width: 100%; text-align: center; }
+.fades { transition: opacity 600ms ease; }
+.listener.dim .fades { opacity: 0.12; }

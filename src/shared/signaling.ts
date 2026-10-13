@@ -3,9 +3,13 @@
 
 export type Role = 'host' | 'listener';
 
+import type { Visual } from './visuals';
+
 export interface PartyMeta {
   name: string;
   live: boolean;
+  /** The look the DJ picked for every phone. Older servers leave it out. */
+  visual?: Visual;
 }
 
 export interface LanAddress {
@@ -25,7 +29,8 @@ export type ServerMessage =
   | { type: 'leave'; from: string }
   | { type: 'offer'; from: string; sdp: string; kbps: number }
   | { type: 'answer'; from: string; sdp: string }
-  | { type: 'candidate'; from: string; candidate: RTCIceCandidateInit };
+  | { type: 'candidate'; from: string; candidate: RTCIceCandidateInit }
+  | { type: 'flash'; color: string };
 
 /** Opens the event stream. EventSource reconnects on its own after blips. */
 export function connectEvents(role: Role, onMessage: (msg: ServerMessage) => void, onError?: () => void) {

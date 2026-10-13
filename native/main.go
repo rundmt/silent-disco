@@ -66,29 +66,10 @@ func main() {
 		prefer = s.ID
 	}
 
-	hub := NewHub(Meta{Name: settings.Name})
-	bc, err := NewBroadcaster(hub, settings.Kbps)
+	engine, api, mux, err := newStation(settings, file)
 	if err != nil {
 		log.Fatal(err)
 	}
-	hub.OnJoin = bc.Join
-	hub.OnLeave = bc.Leave
-	hub.OnAnswer = bc.Answer
-	hub.OnCandidate = bc.Candidate
-
-	var engine *Engine
-	enc, err := NewEncoder(settings.Kbps, func(f []byte) { engine.writeFrame(f) })
-	if err != nil {
-		log.Fatal(err)
-	}
-	engine = NewEngine(hub, bc, enc, settings, file)
-	api := newConsoleAPI(engine)
-
-	mux := http.NewServeMux()
-	mux.Handle("/", webHandler())
-	mux.HandleFunc("/events", hub.ServeEvents)
-	mux.HandleFunc("/signal", hub.ServeSignal)
-	api.register(mux)
 	ln, actualPort, err := listenFrom(*port)
 	if err != nil {
 		log.Fatal(err)
@@ -119,6 +100,36 @@ func main() {
 	signal.Notify(stop, os.Interrupt)
 	<-stop
 	fmt.Println("\nStopping.")
+}
+
+// newStation wires the hub, the WebRTC broadcaster, the encoder and the
+// engine together, with the phone page and the console API on one mux.
+func newStation(settings Settings, file string) (*Engine, *consoleAPI, *http.ServeMux, error) {
+	hub := NewHub(Meta{Name: settings.Name, Visual: settings.Visual})
+	bc, err := NewBroadcaster(hub, settings.Kbps)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	hub.OnJoin = bc.Join
+	hub.OnLeave = bc.Leave
+	hub.OnActive = bc.Active
+	hub.OnAnswer = bc.Answer
+	hub.OnCandidate = bc.Candidate
+
+	var engine *Engine
+	enc, err := NewEncoder(settings.Kbps, func(f []byte) { engine.writeFrame(f) })
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	engine = NewEngine(hub, bc, enc, settings, file)
+	api := newConsoleAPI(engine)
+
+	mux := http.NewServeMux()
+	mux.Handle("/", webHandler())
+	mux.HandleFunc("/events", hub.ServeEvents)
+	mux.HandleFunc("/signal", hub.ServeSignal)
+	api.register(mux)
+	return engine, api, mux, nil
 }
 
 var lastMenu string

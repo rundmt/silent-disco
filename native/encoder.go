@@ -110,6 +110,9 @@ type resampler struct {
 func (r *resampler) process(in []float32, rate int) []float32 {
 	step := float64(rate) / sampleRate
 	frames := len(in) / 2
+	if frames == 0 {
+		return nil // nothing to read, and no frame to remember
+	}
 	at := func(i int) (float32, float32) {
 		if i < 0 {
 			return r.last[0], r.last[1]

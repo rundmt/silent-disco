@@ -13,6 +13,13 @@ if [ -d ../node_modules ]; then
   rm -rf web/dist && cp -R ../dist web/dist
 fi
 
+# The engine, signaling, console API and a real WebRTC phone, in a few
+# seconds. SKIP_TESTS=1 ./build.sh skips them.
+if [ -z "$SKIP_TESTS" ]; then
+  echo "Testing…"
+  go test -tags nolibopusfile ./... || { echo "Tests failed, not building. (SKIP_TESTS=1 ./build.sh to build anyway.)"; exit 1; }
+fi
+
 go build -tags nolibopusfile -o silent-disco .
 
 APP="Silent Disco.app"

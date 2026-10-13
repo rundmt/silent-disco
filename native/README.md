@@ -77,6 +77,10 @@ picked in the window are saved to
 | `window_darwin.go`, `app_darwin.m` | The window, menu bar icon and menus. |
 | `Info.plist` | App bundle info and the permission prompts' wording. |
 | `engine_test.go` | Tests for the source rules above (`go test -tags nolibopusfile`). |
+| `engine_model_test.go` | Model-based tests: random party timelines against the engine's rules. |
+| `property_test.go` | Property tests for the resampler, encoder, app grouping, settings and the hub. |
+| `audio_test.go` | A Pion fake phone that listens over real WebRTC and checks the chord. |
+| `api_test.go` | The DJ console API. |
 | `web/dist` | The built web pages, embedded into the binary. |
 
 The console itself is `../src/console/` (Solid), built with the rest of the

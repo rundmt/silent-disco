@@ -8,9 +8,12 @@
     "start": "node server.js",
     "dev": "node dev.js",
     "build": "vite build",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p e2e",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:go": "cd native && go test -tags nolibopusfile -race ./...",
+    "test:e2e": "bash e2e/run.sh",
+    "test:all": "npm test && npm run typecheck && npm run test:go && npm run test:e2e"
   },
   "engines": {
     "node": ">=18"
@@ -22,6 +25,8 @@
     "xstate": "5.33.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^22.20.5",
     "typescript": "5.9.3",
     "vite": "7.3.7",
     "vite-plugin-solid": "2.11.14",

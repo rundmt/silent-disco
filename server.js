@@ -26,8 +26,13 @@ const MIME = {
   '.json': 'application/json',
 };
 
-// Connected clients, keyed by id. Each has { id, role, res }.
+// Connected clients, keyed by id. Each has { id, role, res, queue, linger }.
+// A listener's event stream drops whenever Android puts Chrome in the
+// background while its audio carries on, so a dropped listener keeps its id
+// for a while, messages for it queue up, and the browser resumes with the id
+// (Last-Event-ID). The host's WebRTC connection notices if the phone is gone.
 const clients = new Map();
+const LINGER_MS = 10 * 60 * 1000;
 let hostId = null;
 let hostMeta = { name: 'Silent Disco', live: false };
 
@@ -53,8 +58,20 @@ function isLoopback(req) {
 function send(id, msg) {
   const c = clients.get(id);
   if (!c) return false;
-  c.res.write(`data: ${JSON.stringify(msg)}\n\n`);
+  const data = JSON.stringify(msg);
+  if (c.res) c.res.write(`id: ${id}\ndata: ${data}\n\n`);
+  else if (c.queue.length < 64) c.queue.push(data);
   return true;
+}
+
+function forget(id) {
+  const c = clients.get(id);
+  if (!c || c.res) return;
+  clients.delete(id);
+  if (hostId) {
+    send(hostId, { type: 'leave', from: id });
+    send(hostId, { type: 'count', listeners: listenerCount() });
+  }
 }
 
 function broadcastListeners(msg) {
@@ -105,7 +122,6 @@ function openEvents(req, res, role) {
   if (role === 'host' && !isLoopback(req)) {
     return json(res, 403, { error: 'The host page only works on the Mac running the server (localhost).' });
   }
-  const id = crypto.randomUUID();
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-store',
@@ -113,7 +129,22 @@ function openEvents(req, res, role) {
     'X-Accel-Buffering': 'no',
   });
   res.write(': connected\n\n');
-  clients.set(id, { id, role, res });
+
+  // A listener coming back from the background resumes its old id.
+  const lastId = req.headers['last-event-id'];
+  const old = role === 'listener' && lastId ? clients.get(lastId) : null;
+  if (old && old.role === 'listener') {
+    clearTimeout(old.linger);
+    if (old.res) old.res.end(); // that stream hasn't noticed it's dead yet
+    old.res = res;
+    for (const data of old.queue.splice(0)) res.write(`id: ${old.id}\ndata: ${data}\n\n`);
+    send(old.id, { type: 'welcome', id: old.id, hostOnline: Boolean(hostId), meta: hostMeta });
+    keepAlive(req, res, old.id);
+    return;
+  }
+
+  const id = crypto.randomUUID();
+  clients.set(id, { id, role, res, queue: [], linger: null });
 
   if (role === 'host') {
     // A new host tab replaces any old one.
@@ -128,17 +159,25 @@ function openEvents(req, res, role) {
     if (hostId) send(hostId, { type: 'count', listeners: listenerCount() });
   }
 
+  keepAlive(req, res, id);
+}
+
+function keepAlive(req, res, id) {
   const ping = setInterval(() => res.write(': ping\n\n'), 15000);
   req.on('close', () => {
     clearInterval(ping);
-    clients.delete(id);
+    const c = clients.get(id);
+    if (!c || c.res !== res) return; // a newer stream took over
     if (id === hostId) {
+      clients.delete(id);
       hostId = null;
       hostMeta.live = false;
       broadcastListeners({ type: 'host-offline' });
-    } else if (hostId) {
-      send(hostId, { type: 'leave', from: id });
-      send(hostId, { type: 'count', listeners: listenerCount() });
+    } else if (c.role === 'host') {
+      clients.delete(id);
+    } else {
+      c.res = null;
+      c.linger = setTimeout(() => forget(id), LINGER_MS);
     }
   });
 }
@@ -166,7 +205,7 @@ const server = http.createServer(async (req, res) => {
 
     // Host: either a meta update or a message to one listener.
     if (msg.type === 'meta') {
-      hostMeta = { name: String(msg.name || 'Silent Disco').slice(0, 60), live: Boolean(msg.live) };
+      hostMeta = { name: String(msg.name || 'Silent Disco').slice(0, 60), live: Boolean(msg.live), visual: hostMeta.visual };
       broadcastListeners({ type: 'meta', meta: hostMeta });
       return json(res, 200, { ok: true });
     }

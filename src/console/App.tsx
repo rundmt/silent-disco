@@ -3,6 +3,7 @@ import { createStore, reconcile } from 'solid-js/store';
 import { api, connect, iconUrl, type SourceInfo, type State, type Tick } from './api';
 import { groupSources, listenUrl, meterPercent, silenceHelp, sourceStatus } from './sources';
 import { QrCode } from '../host/QrCode';
+import { flashColors, palettes, styles, type Palette } from '../shared/visuals';
 
 export function ConsoleApp() {
   // A store reconciled by id keeps list rows (and their icons) in place
@@ -190,6 +191,62 @@ export function ConsoleApp() {
               </select>
             </section>
           </div>
+
+          <section class="panel visuals-panel">
+            <h2>Phone visuals</h2>
+            <div class="visuals-row">
+              <div>
+                <label>Style</label>
+                <div class="chips" id="visualStyle">
+                  <For each={styles}>
+                    {(st) => (
+                      <button
+                        class="chip"
+                        classList={{ selected: s().visual.style === st.id }}
+                        onClick={() => api.setVisual({ ...s().visual, style: st.id })}
+                      >
+                        {st.label}
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </div>
+              <div>
+                <label>Colors</label>
+                <div class="chips">
+                  <For each={Object.entries(palettes) as [Palette, (typeof palettes)[Palette]][]}>
+                    {([id, p]) => (
+                      <button
+                        class="chip swatch-chip"
+                        classList={{ selected: s().visual.palette === id }}
+                        title={p.label}
+                        onClick={() => api.setVisual({ ...s().visual, palette: id })}
+                      >
+                        <span class="swatch" style={{ background: `linear-gradient(90deg, ${p.colors.join(', ')})` }} />
+                        {p.label}
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </div>
+              <div>
+                <label>Flash every phone</label>
+                <div class="chips" id="flash">
+                  <For each={flashColors}>
+                    {(c) => (
+                      <button
+                        class="flash-btn"
+                        style={{ background: c }}
+                        title="Flash all phones"
+                        onPointerDown={() => api.flash(c)}
+                      />
+                    )}
+                  </For>
+                </div>
+              </div>
+            </div>
+            <p class="hint">Each phone draws from the music it's playing, so the visuals stay in time with what every listener hears.</p>
+          </section>
         </div>
       )}
     </Show>

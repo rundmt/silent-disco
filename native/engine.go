@@ -5,6 +5,7 @@ package main
 
 import (
 	"math"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -54,6 +55,7 @@ type Engine struct {
 type State struct {
 	Name      string       `json:"name"`
 	Kbps      int          `json:"kbps"`
+	Visual    Visual       `json:"visual"`
 	Live      bool         `json:"live"`
 	Port      int          `json:"port"`
 	Addresses []string     `json:"addresses"`
@@ -102,7 +104,7 @@ func (e *Engine) fillLoop() {
 func (e *Engine) Start(prefer string, live bool) {
 	e.live.Store(live)
 	e.enc.SetMuted(!live)
-	e.hub.SetMeta(Meta{Name: e.settings.Name, Live: live})
+	e.hub.SetMeta(e.meta())
 	e.mu.Lock()
 	e.sources = e.scan()
 	first, auto := e.pickInitial(prefer)
@@ -192,10 +194,7 @@ func (e *Engine) SetLive(live bool) {
 		return
 	}
 	e.enc.SetMuted(!live)
-	e.mu.Lock()
-	name := e.settings.Name
-	e.mu.Unlock()
-	e.hub.SetMeta(Meta{Name: name, Live: live})
+	e.hub.SetMeta(e.meta())
 	e.changed()
 }
 
@@ -213,9 +212,40 @@ func (e *Engine) SetName(name string) {
 	e.settings.Name = name
 	saveSettings(e.settingsFile, e.settings)
 	e.mu.Unlock()
-	e.hub.SetMeta(Meta{Name: name, Live: e.live.Load()})
+	e.hub.SetMeta(e.meta())
 	e.changed()
 }
+
+// meta is what phones are told about the party.
+func (e *Engine) meta() Meta {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return Meta{Name: e.settings.Name, Live: e.live.Load(), Visual: e.settings.Visual}
+}
+
+func (e *Engine) SetVisual(v Visual) bool {
+	if !v.valid() {
+		return false
+	}
+	e.mu.Lock()
+	e.settings.Visual = v
+	saveSettings(e.settingsFile, e.settings)
+	e.mu.Unlock()
+	e.hub.SetMeta(e.meta())
+	e.changed()
+	return true
+}
+
+// Flash lights up every phone in one color for a moment.
+func (e *Engine) Flash(color string) bool {
+	if !flashColor.MatchString(color) {
+		return false
+	}
+	e.hub.Broadcast(map[string]string{"type": "flash", "color": color})
+	return true
+}
+
+var flashColor = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 func (e *Engine) SetKbps(kbps int) {
 	kbps = clampKbps(kbps)
@@ -232,7 +262,7 @@ func (e *Engine) State() State {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return State{
-		Name: e.settings.Name, Kbps: e.settings.Kbps, Live: e.live.Load(),
+		Name: e.settings.Name, Kbps: e.settings.Kbps, Visual: e.settings.Visual, Live: e.live.Load(),
 		Port: e.Port, Addresses: lanAddresses(),
 		Source: e.current, Status: e.status, Error: e.errMsg, Silent: e.silent, Auto: e.auto,
 		Sources: slices.Clone(e.sources),
