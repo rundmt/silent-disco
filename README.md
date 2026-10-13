@@ -26,16 +26,19 @@ Turn your Mac into a silent disco transmitter. You play music on the Mac (DJ sof
 ## How it works
 
 ```
-DJ software ──► BlackHole (virtual audio cable) ──► Host page in Chrome on your Mac
-                                                        │  WebRTC (Opus, stereo, 192 kbps)
-                                                        ├──► Phone 1 browser
-                                                        ├──► Phone 2 browser
-                                                        └──► …
-server.js: serves the pages and passes connection setup messages. Audio never goes through it.
+Mac app (native/)                                    Browser host (no install, older Macs)
+DJ software / any app ──► Core Audio tap             DJ software ──► BlackHole ──► Host page in Chrome
+        │  Opus, stereo, 192 kbps, WebRTC                                  │  WebRTC
+        ├──► Phone 1 browser                                               ├──► Phone 1 browser
+        ├──► Phone 2 browser                                               └──► …
+        └──► …
 ```
 
-* **Capture.** macOS does not let apps record another app's output directly, so the standard trick is **BlackHole**, a free virtual audio device. Your DJ software outputs to BlackHole, and the host page records from BlackHole like a microphone.
-* **Transport.** The host page opens one WebRTC connection per listener, straight across your Wi-Fi. WebRTC is what video calls use: it is built for low delay, uses the Opus codec (excellent for music at 192 kbps), and hides small Wi-Fi hiccups with error correction.
+There are two ways to run the DJ side. Phones work the same with both.
+
+* **Mac app (recommended, macOS 14.2+).** Captures one app (djay, rekordbox, Serato, Traktor, VirtualDJ, Mixxx…) or all system audio directly with a Core Audio process tap. **No BlackHole, no Chrome.** The DJ still hears everything normally. It encodes Opus once and sends the same packets to every phone. See [`native/README.md`](native/README.md).
+* **Browser host (`npm start`).** A host page in Chrome records a virtual audio device like BlackHole (or shares a tab's audio) and streams it. Works on any Mac with Node, but needs the BlackHole setup below.
+* **Transport.** Either way, audio goes straight from your Mac to each phone over WebRTC across your Wi-Fi: built for low delay, Opus at 192 kbps for music, with error correction for small hiccups. Nothing goes through a server.
 * **Listeners** just need a browser. No install, no account.
 
 ### Latency, honestly
@@ -49,13 +52,25 @@ server.js: serves the pages and passes connection setup messages. Audio never go
 
 In testing the network and buffering part measured about **50 ms**. On a real party Wi-Fi expect 80 to 200 ms, and each listener's phone may drift a little from the next. That's fine for a silent disco because everyone is in their own headphones. Two things add a lot more delay: **Bluetooth headphones add 150 to 300 ms** (wired is best; AirPods are okay), and a crowded, weak Wi-Fi.
 
-## Setup on your Mac (one time)
+## Run it with the Mac app
+
+```
+brew install go opus pkg-config   # once
+cd native && ./build.sh
+open "Silent Disco.app"
+```
+
+Allow the system-audio recording prompt, pick an app (or all system audio) in the window, click **Go live** and show the QR code. Full details are in [`native/README.md`](native/README.md).
+
+## Or: the browser host with BlackHole
+
+### Setup on your Mac (one time)
 
 1. **Install Node.js** (LTS) from https://nodejs.org.
 2. **Install BlackHole 2ch** from https://existential.audio/blackhole/ (free), or with Homebrew: `brew install blackhole-2ch`. Restart your Mac afterwards if it doesn't show up.
 3. **Use Google Chrome** for the host page. (Safari and Firefox also work, but Chrome gives the best audio quality controls.)
 
-## Running a party
+### Running a party
 
 1. Double-click **`Start Silent Disco.command`**, or run `npm start` in this folder from Terminal.
    * The first time, macOS may say it's from an unidentified developer: right-click the file, choose **Open**, then **Open** again.
@@ -140,7 +155,7 @@ In dev mode, phones can still join from the QR code. Unlike `npm start`, dev mod
 
 ## Roadmap ideas
 
-* **Proper Mac app**: in progress in `native/` (Go + Core Audio taps, no BlackHole, native window with the console in `src/console/`). See `native/README.md`.
+* **Mac app release**: the app in `native/` works, but still needs a proper icon, Developer ID signing and notarization, and libopus bundled inside, before it can be a one-click download.
 * **Channels / multiple DJs**: one host page per channel, listeners pick a channel (red/green/blue like real silent disco headsets).
 * **Over the internet**: add a STUN/TURN server and HTTPS so remote friends can join, and an SFU (e.g. LiveKit or mediasoup) to scale to hundreds of listeners.
 * **Tighter sync between phones** with a shared clock and fixed playout delay.
