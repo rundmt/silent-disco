@@ -97,3 +97,34 @@ func TestDetachedPhoneIsForgottenOnceAudioEnds(t *testing.T) {
 		t.Fatal("kept a phone with no stream and no audio")
 	}
 }
+
+func TestHubCapsOpenPhones(t *testing.T) {
+	hub := NewHub(Meta{})
+	var first *client
+	for i := 0; i < maxPhones; i++ {
+		c, _ := hub.attach("")
+		if c == nil {
+			t.Fatalf("phone %d refused under the cap", i)
+		}
+		if first == nil {
+			first = c
+		}
+	}
+	if c, _ := hub.attach(""); c != nil {
+		t.Fatal("a phone over the cap was let in")
+	}
+	// Phones already at the party can still come back.
+	if c, _ := hub.attach(first.id); c != first {
+		t.Fatal("a known phone couldn't resume at the cap")
+	}
+	srv := httptest.NewServer(http.HandlerFunc(hub.ServeEvents))
+	defer srv.Close()
+	res, err := http.Get(srv.URL + "/events?role=listener")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("over the cap: %s, want 503", res.Status)
+	}
+}

@@ -13,7 +13,7 @@ import (
 const (
 	KindSystem = "system" // everything the Mac plays
 	KindApp    = "app"    // one app, via a process tap
-	KindInput  = "input"  // an input device: interface, mixer USB out, BlackHole
+	KindInput  = "input"  // an input device: audio interface, mixer USB out
 	KindTone   = "tone"   // test tone
 )
 

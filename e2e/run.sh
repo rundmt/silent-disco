@@ -4,7 +4,6 @@
 #   npx playwright install chromium
 set -e
 cd "$(dirname "$0")/.."
-npm run build --silent
-rm -rf native/web/dist && cp -R dist native/web/dist
+npm run build --silent   # writes native/web/dist
 (cd native && go build -tags nolibopusfile -o silent-disco-test .)
 npx playwright test "$@"

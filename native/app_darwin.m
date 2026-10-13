@@ -16,6 +16,14 @@
 static SDApp *gApp;
 static id gActivity;
 
+// Only web links leave the window, never file:// or other apps' URL schemes.
+static void openWeb(NSURL *u) {
+    NSString *scheme = u.scheme.lowercaseString;
+    if ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"]) {
+        [[NSWorkspace sharedWorkspace] openURL:u];
+    }
+}
+
 @implementation SDApp
 
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
@@ -146,17 +154,20 @@ static id gActivity;
 - (void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)action
     decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler {
     NSURL *u = action.request.URL;
-    if ([u.host isEqualToString:@"127.0.0.1"] && [u.path isEqualToString:@"/console.html"]) {
+    NSURL *console = webView.URL;
+    BOOL ours = [u.host isEqualToString:@"127.0.0.1"] && [u.path isEqualToString:@"/console.html"] &&
+                (console == nil || [u.port isEqual:console.port]);
+    if (ours) {
         decisionHandler(WKNavigationActionPolicyAllow);
         return;
     }
-    [[NSWorkspace sharedWorkspace] openURL:u];
+    openWeb(u);
     decisionHandler(WKNavigationActionPolicyCancel);
 }
 
 - (WKWebView *)webView:(WKWebView *)webView createWebViewWithConfiguration:(WKWebViewConfiguration *)config
        forNavigationAction:(WKNavigationAction *)action windowFeatures:(WKWindowFeatures *)features {
-    if (action.request.URL) [[NSWorkspace sharedWorkspace] openURL:action.request.URL];
+    if (action.request.URL) openWeb(action.request.URL);
     return nil;
 }
 

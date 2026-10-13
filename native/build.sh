@@ -9,8 +9,7 @@ pkg-config --exists opus 2>/dev/null || { echo "The Opus codec library is missin
 
 # Refresh the embedded web pages (phone page and DJ console) if the web app is set up.
 if [ -d ../node_modules ]; then
-  (cd .. && npm run build --silent)
-  rm -rf web/dist && cp -R ../dist web/dist
+  (cd .. && npm run build --silent)   # writes web/dist
 fi
 
 # The engine, signaling, console API and a real WebRTC phone, in a few

@@ -1,4 +1,4 @@
-// Silent Disco for Mac: captures audio on this Mac (no BlackHole) and streams
+// Silent Disco for Mac: captures audio on this Mac and streams
 // it to phones on the same Wi-Fi with one shared Opus encoder. The DJ console
 // runs in a native window; -nowindow runs it in Terminal instead.
 package main
@@ -75,7 +75,10 @@ func main() {
 		log.Fatal(err)
 	}
 	engine.Port = actualPort
-	go http.Serve(ln, mux)
+	// Phones' event streams stay open, so no write timeout; the header
+	// timeout stops a device on the Wi-Fi from holding connections open idle.
+	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+	go srv.Serve(ln)
 
 	if windowSupported && !*noWindow {
 		// The DJ goes live from the window when ready.
@@ -201,9 +204,6 @@ func webHandler() http.Handler {
 	files := http.FileServer(http.FS(dist))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/host" || r.URL.Path == "/host.html":
-			http.Error(w, "The DJ controls live in the Silent Disco app on this Mac.", http.StatusNotFound)
-			return
 		case strings.HasPrefix(r.URL.Path, "/assets/"):
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		default:

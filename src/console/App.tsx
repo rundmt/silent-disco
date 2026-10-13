@@ -2,7 +2,7 @@ import { createSignal, For, Index, onCleanup, Show } from 'solid-js';
 import { createStore, reconcile } from 'solid-js/store';
 import { api, connect, iconUrl, type SourceInfo, type State, type Tick } from './api';
 import { groupSources, listenUrl, meterPercent, silenceHelp, sourceStatus } from './sources';
-import { QrCode } from '../host/QrCode';
+import { QrCode } from './QrCode';
 import { flashColors, palettes, styles, type Palette } from '../shared/visuals';
 
 export function ConsoleApp() {

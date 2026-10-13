@@ -4,48 +4,52 @@ How the code is laid out and how it's tested. Back to the [README](../README.md)
 
 ## How the code is organized
 
-The web pages are written in **TypeScript** with **Solid** for the UI and **XState** state machines for all the connection logic, built with **Vite**. The server is a single dependency-free Node file.
+Two parts: a Go app in `native/` that captures, encodes and streams the audio, and two web pages in `src/` (TypeScript, Solid, XState, built with Vite) that the app serves and embeds.
+
+```
+DJ software ──Core Audio tap──▶ engine ──▶ Opus encoder ──▶ one shared WebRTC track ──▶ every phone
+                                   ▲                                                    (src/listener)
+                     DJ console (src/console) in the app's window, via a local API
+```
 
 | Path | What it does |
 |---|---|
-| `server.js` | Serves the built app from `dist/` and relays connection setup messages. No dependencies. |
+| `native/` | The Mac app. Its own [README](../native/README.md) lists every file. |
+| `native/web/dist/` | The built pages, embedded into the binary. Committed so `go build` works without Node. |
 | `src/listener/machine.ts` | The phone's lifecycle as a state machine: idle, waiting for the DJ, joining, connecting, playing, dropped and reconnecting. |
-| `src/listener/peer.ts` | The WebRTC connection to the DJ, as an actor the machine starts and stops. Reports stats. |
-| `src/listener/audioOutput.ts` | Playback through Web Audio, so the volume slider works on every phone. |
-| `src/listener/App.tsx` | The phone UI. Status text is derived from the machine's current state. |
-| `src/host/machine.ts` | The DJ console machine. Two parallel regions (audio source, on/off air) and one spawned actor per listener. |
-| `src/host/peer.ts` | One WebRTC connection to one listener. |
-| `src/host/capture.ts` | Opening BlackHole or another input, tab/system audio sharing, device and track watchers. |
-| `src/host/App.tsx`, `Meter.tsx`, `QrCode.tsx` | The host UI. |
-| `src/listener/status.ts` | The status line text, derived from the machine state (kept separate so it's testable). |
-| `src/**/machine.test.ts` | Model-based tests (see below). |
-| `src/console/` | The DJ console for the Mac app window (`native/`). Talks to the app's API instead of doing WebRTC itself. |
-| `src/shared/` | Signaling client, Opus quality tuning, styles. |
-| `dist/` | The built app. Included so `npm start` works without building. |
+| `src/listener/peer.ts` | The WebRTC connection to the app, as an actor the machine starts and stops. Reports stats. |
+| `src/listener/audioOutput.ts` | Playback that keeps going on a locked phone (Web Audio on iOS, a media element elsewhere) plus the analyser the visuals read. |
+| `src/listener/Visualizer.tsx`, `flash.ts` | The phone visuals and the DJ's flashes. |
+| `src/listener/App.tsx`, `status.ts` | The phone UI. Status text is derived from the machine's state. |
+| `src/console/` | The DJ console shown in the app's window. Talks to the app's API (`native/api.go`). |
+| `src/shared/` | Signaling client, Opus tuning, visual styles and palettes, styles. |
+| `e2e/` | Browser tests against the real app. |
+
+Signaling is Server-Sent Events from the app (`/events`) and POSTs from the phone (`/signal`). A phone's id survives a dropped event stream (the browser resumes with `Last-Event-ID`), and the app only forgets a phone once its audio connection is gone too, because Android drops the stream whenever Chrome goes to the background.
 
 ## Changing the code
 
 ```
 npm install        # once
-npm run dev        # hot reload on http://localhost:8080/host.html
-npm run build      # rebuild dist/ for `npm start`
+npm run dev        # the app on :8081 plus hot reload on :8080 (prints the console link)
+npm run build      # rebuild native/web/dist (native/build.sh does this too)
 npm run typecheck
-npm test           # model-based tests of both state machines
+npm test           # model-based tests of the phone's state machine
 npm run test:go    # the Mac app's Go tests, with the race detector
 npm run test:e2e   # browser tests against the real app (builds it first)
 npm run test:all   # all of the above, plus typecheck
 ```
 
-The first time on a machine, `npx playwright install chromium` fetches the browser the e2e tests use.
+`npm run dev -- -tone` passes flags to the app, here a test tone. The first time on a machine, `npx playwright install chromium` fetches the browser the e2e tests use.
 
 ### Model-based tests
 
-`src/listener/machine.test.ts` and `src/host/machine.test.ts` don't list scenarios by hand. `xstate/graph` explores each state machine, finds a path to every distinct state (about 45 for the listener and 315 for the host), and then tries every possible event from each one. Each run drives the real machine with fake signaling, audio devices and WebRTC peers that record what happened, and checks two kinds of rules after every step:
+`src/listener/machine.test.ts` doesn't list scenarios by hand. `xstate/graph` explores the state machine, finds a path to every distinct state, and then tries every possible event from each one. Each run drives the real machine with fake signaling, audio and WebRTC peers that record what happened, and checks two kinds of rules after every step:
 
-* **Invariants** hold in every state, whatever route led there. For example: each listener hears the current source when on air and silence when off; there's never more than one connection per listener; replaced audio sources are released; joining always means a join was just sent.
-* **Transition rules** say what a specific event must do, written separately from the machine. For example: a failed connection always rejoins, a blip while playing waits before rejoining, and picking a device never takes you off air.
+* **Invariants** hold in every state, whatever route led there. For example: there's never more than one connection, and joining always means a join was just sent.
+* **Transition rules** say what a specific event must do, written separately from the machine. For example: a failed connection always rejoins, a blip while playing waits before rejoining, and a dropped event stream that comes back with the same id keeps the audio connection.
 
-When you change a machine, the paths regenerate automatically, so new states get covered without writing new tests.
+When you change the machine, the paths regenerate automatically, so new states get covered without writing new tests.
 
 ### Tests for the Mac app (`native/`)
 
@@ -58,8 +62,6 @@ The phone page's machines are statecharts, so XState can walk them. The Go engin
 * **Browser** (`e2e/`). Chromium phone pages and the DJ console against the real binary with `-nowindow -tone`: a phone hears the DJ, off air and back, the stream to the page server is cut and the music keeps playing on the same connection, the DJ restyles and flashes phones.
 
 `native/build.sh` runs the Go tests before building and stops if they fail (`SKIP_TESTS=1 ./build.sh` to build anyway).
-
-In dev mode, phones can still join from the QR code. Unlike `npm start`, dev mode doesn't lock the host page to this Mac.
 
 ## Latency, honestly
 

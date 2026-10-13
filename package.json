@@ -2,10 +2,9 @@
   "name": "silent-disco",
   "version": "0.2.0",
   "private": true,
-  "description": "Turn a Mac into a silent disco transmitter. Listeners join from their phone browser on the same Wi-Fi.",
+  "description": "A Mac app that turns your DJ setup into a silent disco. Guests listen on their phones over Wi-Fi.",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
     "dev": "node dev.js",
     "build": "vite build",
     "typecheck": "tsc --noEmit && tsc --noEmit -p e2e",

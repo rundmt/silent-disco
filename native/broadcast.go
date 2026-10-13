@@ -103,17 +103,22 @@ func (b *Broadcaster) changed() {
 
 // Join answers a phone's request for the stream with an offer.
 func (b *Broadcaster) Join(id string) {
-	b.Leave(id) // a rejoin replaces the old connection
-
 	pc, err := b.api.NewPeerConnection(webrtc.Configuration{})
 	if err != nil {
 		log.Printf("peer: %v", err)
 		return
 	}
+	// A rejoin replaces the old connection. Swapping under the lock means
+	// joins racing each other can't leave a connection nobody closes.
 	p := &peer{pc: pc}
 	b.mu.Lock()
+	old := b.peers[id]
 	b.peers[id] = p
 	b.mu.Unlock()
+	if old != nil {
+		old.pc.Close()
+		b.changed()
+	}
 
 	sender, err := pc.AddTrack(b.track)
 	if err != nil {

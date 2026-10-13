@@ -1,18 +1,17 @@
 # Silent Disco for Mac
 
-A single app that does everything the browser host page did, without
-BlackHole and without Chrome:
+The whole Silent Disco app: capture, streaming, the phone page and the DJ
+console, in one native binary.
 
 * **Captures audio with a Core Audio process tap** (macOS 14.2+): one app such
   as djay, rekordbox, Serato, Traktor, VirtualDJ or Mixxx, or everything the
   Mac plays. The DJ still hears it normally.
-* **Or an audio input**: a mixer's or controller's USB audio, an audio
-  interface, or BlackHole.
+* **Or an audio input**: a mixer's or controller's USB audio, or an audio
+  interface.
 * **Encodes Opus once** and sends the same packets to every phone over WebRTC
   ([Pion](https://github.com/pion/webrtc)), so CPU use barely grows with the
   crowd.
-* **Serves the phone page** (embedded from `../dist`) and speaks the same
-  signaling protocol as `server.js`, so the listener page is unchanged.
+* **Serves the phone page** (embedded from `web/dist`, built from `../src`).
 * **DJ console in a native window** (WKWebView, no Electron) plus a menu bar
   icon. Closing the window keeps the party going.
 
@@ -69,7 +68,7 @@ picked in the window are saved to
 | `engine.go` | Which source is captured, live/off air, settings; follows apps and devices coming and going. |
 | `sources.go` | The source list: grouping helper processes into apps, spotting DJ software. |
 | `api.go` | The DJ console's API (this Mac only, token-protected). |
-| `hub.go` | Signaling with phones (Server-Sent Events + POST), same protocol as `server.js`. |
+| `hub.go` | Signaling with phones (Server-Sent Events + POST); keeps a phone's id across dropped streams. |
 | `broadcast.go` | Pion WebRTC: one shared Opus track, one peer connection per phone. |
 | `encoder.go` | PCM to 20 ms stereo Opus frames, resampling to 48 kHz if needed. |
 | `capture.go` | The source interface and the test tone. |
@@ -81,7 +80,7 @@ picked in the window are saved to
 | `property_test.go` | Property tests for the resampler, encoder, app grouping, settings and the hub. |
 | `audio_test.go` | A Pion fake phone that listens over real WebRTC and checks the chord. |
 | `api_test.go` | The DJ console API. |
-| `web/dist` | The built web pages, embedded into the binary. |
+| `web/dist` | The built web pages, embedded into the binary (`npm run build` in the repo root). |
 
 The console itself is `../src/console/` (Solid), built with the rest of the
 web app.

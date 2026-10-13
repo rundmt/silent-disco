@@ -2,14 +2,18 @@
 import { defineConfig } from 'vite';
 import solid from 'vite-plugin-solid';
 
-const SIGNAL_SERVER = `http://localhost:${process.env.SIGNAL_PORT || 8081}`;
+// The Mac app embeds the build from native/web/dist. In dev, Vite serves the
+// pages with hot reload and forwards everything else to the app (see dev.js).
+const APP = `http://localhost:${process.env.APP_PORT || 8081}`;
 
 export default defineConfig({
   plugins: [solid()],
   build: {
     target: 'es2020',
+    outDir: 'native/web/dist',
+    emptyOutDir: true,
     rollupOptions: {
-      input: { listener: 'index.html', host: 'host.html', console: 'console.html' },
+      input: { listener: 'index.html', console: 'console.html' },
     },
   },
   // The state machines are tested in plain Node; no DOM needed.
@@ -17,11 +21,10 @@ export default defineConfig({
   server: {
     host: true,
     port: Number(process.env.PORT || 8080),
-    // In dev, Vite serves the pages and forwards signaling to server.js.
     proxy: {
-      '/events': { target: SIGNAL_SERVER, changeOrigin: false },
-      '/signal': { target: SIGNAL_SERVER, changeOrigin: false },
-      '/info': { target: SIGNAL_SERVER, changeOrigin: false },
+      '/events': { target: APP, changeOrigin: false },
+      '/signal': { target: APP, changeOrigin: false },
+      '/api': { target: APP, changeOrigin: false },
     },
   },
 });

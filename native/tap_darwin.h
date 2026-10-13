@@ -1,6 +1,6 @@
 // Audio capture on macOS without a virtual audio driver:
 //  * Core Audio process taps record what other apps play (macOS 14.2+).
-//  * Input devices (an audio interface, a mixer's USB out, BlackHole) are
+//  * Input devices (an audio interface, a mixer's USB out) are
 //    read directly from the hardware.
 #pragma once
 

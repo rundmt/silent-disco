@@ -1,7 +1,6 @@
 package main
 
-// Signaling hub: the same protocol server.js speaks, so the existing phone
-// page works unchanged. Phones hold a Server-Sent Events stream for messages
+// Signaling hub. Phones hold a Server-Sent Events stream for messages
 // from us and POST /signal for messages to us. The "host" is this process.
 
 import (
@@ -56,6 +55,10 @@ type client struct {
 // its id, the browser resumes with it (Last-Event-ID), and the phone is only
 // forgotten once its audio connection is gone too.
 const lingerCheck = 30 * time.Second
+
+// maxPhones caps open phone pages, so one device on the Wi-Fi can't open
+// thousands and exhaust memory and WebRTC connections.
+const maxPhones = 500
 
 // Hub tracks connected phones and routes their signaling messages.
 type Hub struct {
@@ -142,6 +145,10 @@ func (h *Hub) ServeEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 
 	c, stop := h.attach(r.Header.Get("Last-Event-ID"))
+	if c == nil {
+		http.Error(w, "This party is full.", http.StatusServiceUnavailable)
+		return
+	}
 	h.mu.Lock()
 	meta := h.meta
 	h.mu.Unlock()
@@ -177,6 +184,9 @@ func (h *Hub) attach(lastID string) (*client, chan struct{}) {
 	defer h.mu.Unlock()
 	c := h.clients[lastID]
 	if c == nil {
+		if len(h.clients) >= maxPhones {
+			return nil, nil
+		}
 		c = &client{id: newID(), out: make(chan []byte, 64)}
 		h.clients[c.id] = c
 	}
