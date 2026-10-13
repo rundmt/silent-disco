@@ -2,11 +2,9 @@
 
 ![status: alpha](https://img.shields.io/badge/status-alpha-orange) ![license: MIT](https://img.shields.io/badge/license-MIT-blue)
 
-> **Alpha:** a side project under active development. Expect rough edges, and the Mac app in `native/` isn't packaged for download yet.
+Turn your Mac into a silent disco. You play music, everyone scans a QR code on their phone and listens in their own headphones, and the room stays quiet. No app for guests, no special hardware.
 
-Turn your Mac into a silent disco transmitter. You play music on the Mac (DJ software, Spotify, anything), and people on the same Wi-Fi scan a QR code, tap **Listen** in their phone's browser and hear it in their headphones. No app for listeners, no special hardware.
-
-## What it looks like
+> Alpha: a side project I'm still tinkering with, so expect rough edges.
 
 <table>
   <tr>
@@ -15,150 +13,52 @@ Turn your Mac into a silent disco transmitter. You play music on the Mac (DJ sof
     <td width="20%"><img src="docs/listener-playing.png" alt="Phone page: listening live with visualizer and volume"></td>
   </tr>
   <tr>
-    <td align="center"><b>1. The DJ goes live</b><br>Pick the audio source, hit <i>Go live</i>, show the QR code.</td>
-    <td align="center"><b>2. Guests scan and tap</b><br>No app or account, just a browser.</td>
-    <td align="center"><b>3. Everyone dances silently</b><br>Own headphones, own volume, ~60 ms delay.</td>
+    <td align="center"><b>1. Go live</b><br>Pick what to play, show the QR code.</td>
+    <td align="center"><b>2. Scan and tap</b><br>Guests just need a browser.</td>
+    <td align="center"><b>3. Dance quietly</b><br>Own headphones, own volume.</td>
   </tr>
 </table>
 
-**In short:** the music plays on your Mac, the Mac streams it over Wi-Fi to every phone that scans the QR code, and each guest listens in their own headphones while the room stays quiet.
-
 ## How it works
 
-```
-Mac app (native/)                                    Browser host (no install, older Macs)
-DJ software / any app ──► Core Audio tap             DJ software ──► BlackHole ──► Host page in Chrome
-        │  Opus, stereo, 192 kbps, WebRTC                                  │  WebRTC
-        ├──► Phone 1 browser                                               ├──► Phone 1 browser
-        ├──► Phone 2 browser                                               └──► …
-        └──► …
-```
+Your Mac grabs whatever audio you're playing and streams it over Wi-Fi to every phone that joins, using WebRTC (the same tech as video calls) so the delay stays small, around 60 to 200 ms on a normal network. Nothing goes through the internet or a server.
 
-There are two ways to run the DJ side. Phones work the same with both.
+There are two ways to run the Mac side:
 
-* **Mac app (recommended, macOS 14.2+).** Captures one app (djay, rekordbox, Serato, Traktor, VirtualDJ, Mixxx…) or all system audio directly with a Core Audio process tap. **No BlackHole, no Chrome.** The DJ still hears everything normally. It encodes Opus once and sends the same packets to every phone. See [`native/README.md`](native/README.md).
-* **Browser host (`npm start`).** A host page in Chrome records a virtual audio device like BlackHole (or shares a tab's audio) and streams it. Works on any Mac with Node, but needs the BlackHole setup below.
-* **Transport.** Either way, audio goes straight from your Mac to each phone over WebRTC across your Wi-Fi: built for low delay, Opus at 192 kbps for music, with error correction for small hiccups. Nothing goes through a server.
-* **Listeners** just need a browser. No install, no account.
+* **Mac app** (in `native/`, macOS 14.2+): picks up audio straight from DJ software or the whole system. Nothing else to install.
+* **Browser version** (`npm start`): works on any Mac, but needs [BlackHole](https://existential.audio/blackhole/) (a free virtual audio cable) to capture sound.
 
-### Latency, honestly
+## Try it
 
-| Approach | Typical delay | Why not |
-|---|---|---|
-| Twitch / HLS streaming | 3 to 30 s | Way too late to dance to |
-| Plain web radio (Icecast/MP3) | 1 to 5 s | Same problem |
-| **WebRTC on local Wi-Fi (this)** | **~60 to 200 ms** | Chosen |
-| Raw packets + custom native app | ~20 to 50 ms | Needs an app installed on every phone |
-
-In testing the network and buffering part measured about **50 ms**. On a real party Wi-Fi expect 80 to 200 ms, and each listener's phone may drift a little from the next. That's fine for a silent disco because everyone is in their own headphones. Two things add a lot more delay: **Bluetooth headphones add 150 to 300 ms** (wired is best; AirPods are okay), and a crowded, weak Wi-Fi.
-
-## Run it with the Mac app
+**Browser version:**
 
 ```
-brew install go opus pkg-config   # once
+brew install blackhole-2ch    # once, then restart
+npm install && npm start
+```
+
+Open `http://localhost:8080/host` in Chrome, pick **BlackHole 2ch**, send your music app's output to it, click **Go live**, and have guests scan the QR code.
+
+**Mac app:**
+
+```
+brew install go opus pkg-config
 cd native && ./build.sh
 open "Silent Disco.app"
 ```
 
-Allow the system-audio recording prompt, pick an app (or all system audio) in the window, click **Go live** and show the QR code. Full details are in [`native/README.md`](native/README.md).
+Allow the audio recording prompt, pick an app, and go live. More in [`native/README.md`](native/README.md).
 
-## Or: the browser host with BlackHole
+## Good to know
 
-### Setup on your Mac (one time)
+* Phones must be on the **same Wi-Fi** as the Mac. Venue and guest networks often block devices from talking to each other, so a cheap travel router is the reliable fix.
+* A recent MacBook handles a few dozen listeners. Bluetooth headphones add noticeable delay, wired is best.
+* Anyone on the Wi-Fi with the link can listen.
 
-1. **Install Node.js** (LTS) from https://nodejs.org.
-2. **Install BlackHole 2ch** from https://existential.audio/blackhole/ (free), or with Homebrew: `brew install blackhole-2ch`. Restart your Mac afterwards if it doesn't show up.
-3. **Use Google Chrome** for the host page. (Safari and Firefox also work, but Chrome gives the best audio quality controls.)
+## More
 
-### Running a party
-
-1. Double-click **`Start Silent Disco.command`**, or run `npm start` in this folder from Terminal.
-   * The first time, macOS may say it's from an unidentified developer: right-click the file, choose **Open**, then **Open** again.
-   * If macOS asks whether **node** may accept incoming network connections, click **Allow**. Phones can't connect otherwise.
-2. The host page opens at `http://localhost:8080/host`. Open it in Chrome if it opened somewhere else, and allow microphone access (that's how it reads BlackHole).
-3. Pick **BlackHole 2ch** as the input (it's chosen automatically if installed).
-4. In your DJ software, set the **master output** to **BlackHole 2ch**. Keep your headphone cue on your controller or audio interface as usual. You should see the level meter move.
-   * To *also* hear the master on the Mac's speakers or an interface, open **Audio MIDI Setup**, click **+ → Create Multi-Output Device**, tick BlackHole 2ch and your speakers, and choose that Multi-Output Device as the output.
-   * Not using DJ software? Set the Mac's sound output (System Settings → Sound) to BlackHole or that Multi-Output Device, and anything you play is broadcast.
-5. Click **Go live**. Put the QR code on a screen or print it.
-6. Guests join the same Wi-Fi, scan, tap **Tap to listen**, and plug in headphones.
-
-**No BlackHole?** The **Use tab / system audio instead** button lets Chrome share a browser tab's audio (e.g. a YouTube or SoundCloud tab), and on recent macOS versions the whole system's audio.
-
-## Things to know
-
-* **Same network.** Phones must be on the same Wi-Fi as the Mac. Hotel, venue and many "guest" networks block phones from talking to each other ("client isolation"). If people get stuck on "Connecting to the DJ…", that's the likely cause. A cheap travel router or your own home router is the reliable fix.
-* **How many listeners?** Each listener is a separate stream from your Mac (192 kbps each), so 30 listeners ≈ 6 Mbit/s of Wi-Fi. A recent MacBook on decent Wi-Fi should handle a few dozen. Drop Quality to 128 kbps for bigger groups. Going past ~50 needs a relay server (see roadmap).
-* **Phones.** Listeners should keep the page open with the screen on (the page asks the phone to stay awake). Locking an iPhone can pause WebRTC audio. The volume slider works on every phone, and on iPhone audio plays even with the silent switch on (iOS 17+).
-* **Keep the host tab open.** If you reload it or restart the server, listeners reconnect automatically.
-* **Port.** Uses port 8080. To change it: `PORT=9000 npm start`.
-* **Security.** Anyone on the same Wi-Fi with the link can listen. The host page only works from the Mac itself.
-
-## How the code is organized
-
-The web pages are written in **TypeScript** with **Solid** for the UI and **XState** state machines for all the connection logic, built with **Vite**. The server is a single dependency-free Node file.
-
-| Path | What it does |
-|---|---|
-| `server.js` | Serves the built app from `dist/` and relays connection setup messages. No dependencies. |
-| `src/listener/machine.ts` | The phone's lifecycle as a state machine: idle, waiting for the DJ, joining, connecting, playing, dropped and reconnecting. |
-| `src/listener/peer.ts` | The WebRTC connection to the DJ, as an actor the machine starts and stops. Reports stats. |
-| `src/listener/audioOutput.ts` | Playback through Web Audio, so the volume slider works on every phone. |
-| `src/listener/App.tsx` | The phone UI. Status text is derived from the machine's current state. |
-| `src/host/machine.ts` | The DJ console machine. Two parallel regions (audio source, on/off air) and one spawned actor per listener. |
-| `src/host/peer.ts` | One WebRTC connection to one listener. |
-| `src/host/capture.ts` | Opening BlackHole or another input, tab/system audio sharing, device and track watchers. |
-| `src/host/App.tsx`, `Meter.tsx`, `QrCode.tsx` | The host UI. |
-| `src/listener/status.ts` | The status line text, derived from the machine state (kept separate so it's testable). |
-| `src/**/machine.test.ts` | Model-based tests (see below). |
-| `src/console/` | The DJ console for the Mac app window (`native/`). Talks to the app's API instead of doing WebRTC itself. |
-| `src/shared/` | Signaling client, Opus quality tuning, styles. |
-| `dist/` | The built app. Included so `npm start` works without building. |
-
-## Changing the code
-
-```
-npm install        # once
-npm run dev        # hot reload on http://localhost:8080/host.html
-npm run build      # rebuild dist/ for `npm start`
-npm run typecheck
-npm test           # model-based tests of both state machines
-npm run test:go    # the Mac app's Go tests, with the race detector
-npm run test:e2e   # browser tests against the real app (builds it first)
-npm run test:all   # all of the above, plus typecheck
-```
-
-The first time on a machine, `npx playwright install chromium` fetches the browser the e2e tests use.
-
-### Model-based tests
-
-`src/listener/machine.test.ts` and `src/host/machine.test.ts` don't list scenarios by hand. `xstate/graph` explores each state machine, finds a path to every distinct state (about 45 for the listener and 315 for the host), and then tries every possible event from each one. Each run drives the real machine with fake signaling, audio devices and WebRTC peers that record what happened, and checks two kinds of rules after every step:
-
-* **Invariants** hold in every state, whatever route led there. For example: each listener hears the current source when on air and silence when off; there's never more than one connection per listener; replaced audio sources are released; joining always means a join was just sent.
-* **Transition rules** say what a specific event must do, written separately from the machine. For example: a failed connection always rejoins, a blip while playing waits before rejoining, and picking a device never takes you off air.
-
-When you change a machine, the paths regenerate automatically, so new states get covered without writing new tests.
-
-### Tests for the Mac app (`native/`)
-
-The phone page's machines are statecharts, so XState can walk them. The Go engine isn't a statechart; its model is a fake Mac plus a list of rules, and [rapid](https://github.com/flyingmutant/rapid) generates the walks:
-
-* **Model-based** (`engine_model_test.go`). Thousands of random party timelines: apps open, quit, restart and start playing, inputs get plugged and unplugged, macOS blocks a source, the DJ picks sources and goes live. After every step the engine must obey the rules: exactly one capture while capturing, of the right processes; an error always says why; once the DJ picks a source it never switches away on its own; phones are told the truth about being live and hear silence when off air. Rescans have their own rules (follow an app to its new processes after a restart, wait under the same name when it quits, don't retry a blocked capture until something changes). A failure shrinks to the shortest timeline that breaks a rule.
-* **Property** (`property_test.go`). Rules that hold for any input: the resampler gives the right length, never overshoots, keeps a steady level, and sounds the same however Core Audio chunks the buffers; every full 20 ms of audio is exactly one Opus frame; each process lands in one app and the list is in DJ-first order; any settings file, even garbage, loads as something usable; and the hub never forgets a phone whose audio is still playing, however its event streams drop and reconnect.
-* **Real audio** (`audio_test.go`). A fake phone built from Pion connects over real WebRTC, decodes the Opus it receives, and checks the test chord arrives with C♯ on the left and E on the right. Then it goes off air (silence, not a gap), drops its event stream (the audio keeps flowing), and resumes as the same phone.
-* **Console API** (`api_test.go`). The token and this-Mac-only checks, source picks, going live, name and quality limits, visuals and flashes reaching phones.
-* **Browser** (`e2e/`). Chromium phone pages and the DJ console against the real binary with `-nowindow -tone`: a phone hears the DJ, off air and back, the stream to the page server is cut and the music keeps playing on the same connection, the DJ restyles and flashes phones.
-
-`native/build.sh` runs the Go tests before building and stops if they fail (`SKIP_TESTS=1 ./build.sh` to build anyway).
-
-In dev mode, phones can still join from the QR code. Unlike `npm start`, dev mode doesn't lock the host page to this Mac.
-
-## Roadmap ideas
-
-* **Mac app release**: the app in `native/` works, but still needs a proper icon, Developer ID signing and notarization, and libopus bundled inside, before it can be a one-click download.
-* **Channels / multiple DJs**: one host page per channel, listeners pick a channel (red/green/blue like real silent disco headsets).
-* **Over the internet**: add a STUN/TURN server and HTTPS so remote friends can join, and an SFU (e.g. LiveKit or mediasoup) to scale to hundreds of listeners.
-* **Tighter sync between phones** with a shared clock and fixed playout delay.
+* [Development notes](docs/development.md): code layout, tests, latency numbers
+* Ideas for later: multiple channels (red/green/blue like real silent disco headsets), joining over the internet, a downloadable signed Mac app
 
 ## License
 
