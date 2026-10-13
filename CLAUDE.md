@@ -14,6 +14,7 @@ A native Mac app that captures DJ software audio and streams it to phones on the
 - Always pass `-tags nolibopusfile` to `go build` / `go test` (in `native/`).
 - `npm run test:all`: vitest, typecheck, `go test -race`, Playwright. `npm test` alone is the phone machine's model-based tests.
 - `cd native && ./build.sh`: web build, Go tests, binary and ad-hoc signed `Silent Disco.app` (needs `brew install go opus pkg-config`).
+- `native/release.sh <version>`: the downloadable app (static Opus built from source, arm64 + x86_64 via lipo, ad-hoc signed, zipped to `native/dist/`). `.github/workflows/release.yml` runs it on `v*` tags and attaches the zip to a GitHub Release.
 - `npm run dev`: app on :8081 plus Vite hot reload on :8080; prints the console URL with its token.
 
 ## How it fits together

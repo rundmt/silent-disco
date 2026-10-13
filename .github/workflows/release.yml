@@ -1,0 +1,46 @@
+# Builds the downloadable Mac app and attaches it to a GitHub Release.
+# Push a version tag to publish one:  git tag v0.3.0 && git push origin v0.3.0
+# Run it by hand from the Actions tab to get the zip as a build artifact.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: native/go.mod
+          cache-dependency-path: native/go.sum
+
+      - name: Tools
+        run: brew install opus pkg-config
+
+      - name: Test
+        working-directory: native
+        run: go test -tags nolibopusfile ./...
+
+      - name: Build the app
+        working-directory: native
+        run: ./release.sh "${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: silent-disco-mac
+          path: native/dist/*.zip
+
+      - name: Publish the release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: native/dist/*.zip
+          generate_release_notes: true

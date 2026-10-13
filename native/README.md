@@ -87,7 +87,8 @@ web app.
 
 ## Not yet
 
-* A proper app icon, signing with a Developer ID and notarizing (so it opens
-  on other Macs without warnings), and bundling libopus inside the app.
+* A proper app icon, and signing with a Developer ID and notarizing (so it
+  opens on other Macs without a warning). `release.sh` already makes a
+  self-contained Apple Silicon + Intel app with Opus built in.
 * Picking which input channels to use (it takes 1–2).
 * Windows.

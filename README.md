@@ -31,9 +31,18 @@ It encodes the audio once as Opus and streams it over WebRTC (the tech behind vi
 
 ## Getting started
 
-### 1. Build the app (once)
+### 1. Get the app
 
-You need a Mac on macOS 14.2 or later and [Homebrew](https://brew.sh).
+You need a Mac on macOS 14.2 or later (Apple Silicon or Intel).
+
+1. Download **Silent-Disco-…-mac.zip** from the [latest release](https://github.com/rundmt/silent-disco/releases/latest) and unzip it.
+2. Drag **Silent Disco.app** to Applications.
+3. Open it. The app isn't signed with an Apple Developer ID yet, so the first time macOS says it can't check it for malware. Click **Done**, then go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to Silent Disco. You only do this once.
+
+<details>
+<summary>Or build it yourself</summary>
+
+You need [Homebrew](https://brew.sh).
 
 ```
 brew install go opus pkg-config
@@ -42,13 +51,11 @@ cd silent-disco/native
 ./build.sh
 ```
 
-This runs the tests and makes **Silent Disco.app** in the `native` folder. Drag it to Applications if you like. If you change the phone page or console in `src/`, run `npm install` once in the repo root and `build.sh` rebuilds them too.
+This runs the tests and makes **Silent Disco.app** in the `native` folder. If you change the phone page or console in `src/`, run `npm install` once in the repo root and `build.sh` rebuilds them too. `./release.sh` makes the same self-contained, Apple Silicon + Intel app the releases have.
+
+</details>
 
 ### 2. First launch
-
-```
-open "Silent Disco.app"
-```
 
 macOS asks a few things the first time. Allow them all:
 
@@ -56,7 +63,7 @@ macOS asks a few things the first time. Allow them all:
 * **Local network** (macOS 15 and later), so phones can reach your Mac.
 * **Incoming connections**, if your firewall is on.
 
-If you miss one, the console shows a button that opens the right Privacy & Security setting. A rebuilt app counts as new to macOS, so it may ask again after `build.sh`.
+If you miss one, the console shows a button that opens the right Privacy & Security setting. If you build it yourself, each rebuild counts as a new app to macOS, so it may ask again.
 
 ### 3. Pick your music
 
@@ -95,7 +102,7 @@ There's also a Terminal mode with flags like `-app serato` and `-tone`; see [`na
 ## More
 
 * [Development notes](docs/development.md): code layout, dev mode, tests, latency
-* Ideas for later: multiple channels (red/green/blue like real silent disco headsets), Windows, joining over the internet, a signed downloadable app
+* Ideas for later: multiple channels (red/green/blue like real silent disco headsets), Windows, joining over the internet, a signed and notarized app
 
 ## License
 
