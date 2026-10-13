@@ -1,5 +1,9 @@
 # Silent Disco
 
+![status: alpha](https://img.shields.io/badge/status-alpha-orange) ![license: MIT](https://img.shields.io/badge/license-MIT-blue)
+
+> **Alpha:** a side project under active development. Expect rough edges, and the Mac app in `native/` isn't packaged for download yet.
+
 Turn your Mac into a silent disco transmitter. You play music on the Mac (DJ software, Spotify, anything), and people on the same Wi-Fi scan a QR code, tap **Listen** in their phone's browser and hear it in their headphones. No app for listeners, no special hardware.
 
 ## What it looks like
@@ -140,3 +144,7 @@ In dev mode, phones can still join from the QR code. Unlike `npm start`, dev mod
 * **Channels / multiple DJs**: one host page per channel, listeners pick a channel (red/green/blue like real silent disco headsets).
 * **Over the internet**: add a STUN/TURN server and HTTPS so remote friends can join, and an SFU (e.g. LiveKit or mediasoup) to scale to hundreds of listeners.
 * **Tighter sync between phones** with a shared clock and fixed playout delay.
+
+## License
+
+[MIT](LICENSE)
