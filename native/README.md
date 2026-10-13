@@ -75,6 +75,7 @@ picked in the window are saved to
 | `capture_darwin.go`, `tap_darwin.m` | Process taps, input devices, app list and icons (Objective-C via cgo). |
 | `window_darwin.go`, `app_darwin.m` | The window, menu bar icon and menus. |
 | `Info.plist` | App bundle info and the permission prompts' wording. |
+| `AppIcon.icns`, `AppIcon.png` | The app icon (the .icns is made from the 1024 px PNG). |
 | `engine_test.go` | Tests for the source rules above (`go test -tags nolibopusfile`). |
 | `engine_model_test.go` | Model-based tests: random party timelines against the engine's rules. |
 | `property_test.go` | Property tests for the resampler, encoder, app grouping, settings and the hub. |

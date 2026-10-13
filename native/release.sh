@@ -45,9 +45,10 @@ build_app() { # arch goarch host
 build_app arm64 arm64 aarch64-apple-darwin
 build_app x86_64 amd64 x86_64-apple-darwin
 
-rm -rf "$APP" && mkdir -p "$APP/Contents/MacOS"
+rm -rf "$APP" && mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 lipo -create -output "$APP/Contents/MacOS/silent-disco" "$BUILD/silent-disco-arm64" "$BUILD/silent-disco-amd64"
 sed -e "s|<string>0.3.0</string>|<string>${VERSION#v}</string>|" Info.plist > "$APP/Contents/Info.plist"
+cp AppIcon.icns "$APP/Contents/Resources/"
 
 # Fail rather than ship an app that still needs Homebrew.
 if otool -L "$APP/Contents/MacOS/silent-disco" | grep -qE "opus|/opt/homebrew|/usr/local"; then

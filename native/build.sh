@@ -23,9 +23,10 @@ go build -tags nolibopusfile -o silent-disco .
 
 APP="Silent Disco.app"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp silent-disco "$APP/Contents/MacOS/silent-disco"
 cp Info.plist "$APP/Contents/Info.plist"
+cp AppIcon.icns "$APP/Contents/Resources/"
 # Ad-hoc signature so macOS can remember the permissions you grant. Each
 # rebuild is a "new" app to macOS, so it may ask again after rebuilding.
 codesign --force --sign - "$APP" >/dev/null 2>&1 || true
