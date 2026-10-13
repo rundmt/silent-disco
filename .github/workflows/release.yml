@@ -1,5 +1,5 @@
 # Builds the downloadable Mac app and attaches it to a GitHub Release.
-# Push a version tag to publish one:  git tag v0.3.0 && git push origin v0.3.0
+# Push a version tag to publish one:  git tag v0.3.1 && git push origin v0.3.1
 # Run it by hand from the Actions tab to get the zip as a build artifact.
 name: Release
 

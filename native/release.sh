@@ -47,7 +47,8 @@ build_app x86_64 amd64 x86_64-apple-darwin
 
 rm -rf "$APP" && mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 lipo -create -output "$APP/Contents/MacOS/silent-disco" "$BUILD/silent-disco-arm64" "$BUILD/silent-disco-amd64"
-sed -e "s|<string>0.3.0</string>|<string>${VERSION#v}</string>|" Info.plist > "$APP/Contents/Info.plist"
+cp Info.plist "$APP/Contents/Info.plist"
+plutil -replace CFBundleShortVersionString -string "${VERSION#v}" "$APP/Contents/Info.plist"
 cp AppIcon.icns "$APP/Contents/Resources/"
 
 # Fail rather than ship an app that still needs Homebrew.
